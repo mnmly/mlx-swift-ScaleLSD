@@ -53,11 +53,13 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        // SwiftUI demo. Shipped as an executable target rather than an .xcodeproj so it builds
-        // with the same `xcodebuild -scheme` invocation as the CLI.
+        // SwiftUI demo. Lives under Examples/ but is declared as an executable target rather
+        // than a separate .xcodeproj, so it builds with the same `xcodebuild -scheme`
+        // invocation as the CLI and cannot silently stop compiling against the library.
         .executableTarget(
             name: "ScaleLSDDemo",
             dependencies: ["MLXScaleLSD"],
+            path: "Examples/ScaleLSDDemo",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

@@ -94,8 +94,8 @@ xcodebuild -scheme scalelsd -destination 'platform=macOS' \
 
 ## Demo app
 
-A SwiftUI demo ships as an executable target — drop an image, drag the thresholds, download
-weights from within the app:
+[`Examples/ScaleLSDDemo`](Examples/ScaleLSDDemo) is a macOS SwiftUI app — drop an image, drag
+the thresholds, download weights from within the app:
 
 ```bash
 xcodebuild -scheme ScaleLSDDemo -destination 'platform=macOS' \
