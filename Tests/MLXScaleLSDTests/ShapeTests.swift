@@ -44,3 +44,57 @@ struct ShapeTests {
         #expect(output.shape == [1, 64, 64, 9])
     }
 }
+
+/// Junction non-maximum suppression. Guarded by tests because the default path disables it,
+/// so a break here is otherwise only visible to someone toggling it in the GUI.
+struct SuppressionTests {
+
+    /// Build a HATField whose junction heatmap is `values`, laid out (H, W).
+    private func field(_ values: [[Float]]) -> HATField {
+        let h = values.count
+        let w = values[0].count
+        // Channel 5/6 are the junction logits; softmax over them must yield `values` in
+        // channel 6, so set logit 5 to 0 and logit 6 to logit(v).
+        var raw = [Float](repeating: 0, count: h * w * 9)
+        for y in 0 ..< h {
+            for x in 0 ..< w {
+                let v = min(max(values[y][x], 1e-6), 1 - 1e-6)
+                raw[(y * w + x) * 9 + 6] = log(v / (1 - v))
+            }
+        }
+        return HATField(rawOutput: MLXArray(raw, [1, h, w, 9]))
+    }
+
+    @Test("Suppression preserves the input shape")
+    func preservesShape() {
+        let input = field(Array(repeating: Array(repeating: Float(0.1), count: 16), count: 16))
+        let suppressed = input.suppressedJunctionHeatmap(kernelSize: 3)
+        eval(suppressed)
+        #expect(suppressed.shape == input.junctionHeatmap.shape)
+    }
+
+    @Test("Suppression keeps local maxima and zeroes their neighbours")
+    func keepsPeaks() {
+        var values = Array(repeating: Array(repeating: Float(0.01), count: 9), count: 9)
+        values[4][4] = 0.9  // isolated peak
+        values[4][5] = 0.5  // neighbour, must be suppressed
+        values[1][1] = 0.7  // a second, separated peak
+
+        let suppressed = field(values).suppressedJunctionHeatmap(kernelSize: 3)
+        eval(suppressed)
+        let out = suppressed.asArray(Float.self)
+
+        #expect(out[4 * 9 + 4] > 0.5, "the peak should survive")
+        #expect(out[1 * 9 + 1] > 0.5, "a separated peak should survive")
+        #expect(out[4 * 9 + 5] == 0, "a neighbour of a stronger peak should be suppressed")
+    }
+
+    @Test("kernelSize 1 is the identity")
+    func identity() {
+        let input = field([[0.2, 0.4], [0.6, 0.1]])
+        let suppressed = input.suppressedJunctionHeatmap(kernelSize: 1)
+        eval(suppressed)
+        #expect(
+            suppressed.asArray(Float.self) == input.junctionHeatmap.asArray(Float.self))
+    }
+}

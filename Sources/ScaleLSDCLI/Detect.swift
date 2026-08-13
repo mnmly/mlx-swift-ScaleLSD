@@ -123,6 +123,16 @@ struct Detect: AsyncParsableCommand {
                     return "\(where_)x\(vanishing.supportingSegments.count)"
                 }
                 summary += "  vps: " + (described.isEmpty ? "none" : described.joined(separator: " "))
+                if let pose = CameraPoseEstimator.estimate(
+                    vanishingPoints: vps,
+                    imageSize: (width: result.imageWidth, height: result.imageHeight))
+                {
+                    summary += String(
+                        format: "\n    camera: focal %.1f px, hFOV %.1f°, roll %.2f°, pitch %.2f°",
+                        pose.focalLength,
+                        pose.horizontalFieldOfView(width: Float(result.imageWidth)),
+                        pose.roll, pose.pitch)
+                }
             }
             print(summary)
         }

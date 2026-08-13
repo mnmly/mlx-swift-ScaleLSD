@@ -85,11 +85,32 @@ public struct HATField {
     /// Suppress non-maximal junction responses within a `kernelSize` window.
     ///
     /// A `kernelSize` of 1 is the identity, which is upstream's behaviour when NMS is disabled.
+    ///
+    /// The dilation is computed as a maximum over shifted views rather than with
+    /// `MLXNN.MaxPool2d`: that layer builds its pad widths as `[0, 0] + padding + [0, 0]`, which
+    /// is six entries for a 4-D NHWC input, and its strided-window shape math then produces a
+    /// differently-shaped result that fails to broadcast here.
     public func suppressedJunctionHeatmap(kernelSize: Int) -> MLXArray {
         guard kernelSize > 1 else { return junctionHeatmap }
-        let pool = MaxPool2d(
-            kernelSize: .init(kernelSize), stride: .init(1), padding: .init(kernelSize / 2))
-        let pooled = pool(junctionHeatmap)
-        return junctionHeatmap * (junctionHeatmap .== pooled)
+        let radius = kernelSize / 2
+        let h = height
+        let w = width
+
+        // -infinity is the identity for a maximum, so the border behaves as PyTorch's
+        // `max_pool2d(..., padding=)` does.
+        let widths: [IntOrPair] = [
+            .init(0), .init(radius), .init(radius), .init(0),
+        ]
+        let padded = MLX.padded(
+            junctionHeatmap, widths: widths, mode: .constant,
+            value: MLXArray(-Float.infinity).asType(junctionHeatmap.dtype))
+
+        var dilated = padded[0..., 0 ..< h, 0 ..< w, 0...]
+        for dy in 0 ..< kernelSize {
+            for dx in 0 ..< kernelSize where !(dy == 0 && dx == 0) {
+                dilated = maximum(dilated, padded[0..., dy ..< (dy + h), dx ..< (dx + w), 0...])
+            }
+        }
+        return junctionHeatmap * (junctionHeatmap .== dilated)
     }
 }
