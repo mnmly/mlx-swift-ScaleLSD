@@ -144,16 +144,12 @@ Implemented and verified:
 - HAT-field decode, junction NMS + top-k, wireframe matching.
 - `encodels` line-to-field encoder (the CUDA extension upstream), matching a scalar reference
   to 1.2e-07.
+- The `--use-lsd` rectifier path, via [swift-lsd](../swift-lsd) — an independent implementation
+  of the LSD algorithm matching `cv2.createLineSegmentDetector(LSD_REFINE_NONE)`. Only the
+  *direction* channel of the LSD field survives into the network's output (upstream overwrites
+  the rest), so that is all this port computes; see
+  `Sources/MLXScaleLSD/Decode/LineFieldEncoder.swift`.
 - Shared `ScaleLSDSession`, CLI, SwiftUI demo, benchmark, parity harness.
-
-Not yet implemented:
-
-- **The `--use-lsd` rectifier path.** It needs a line-segment detector equivalent to OpenCV's
-  `createLineSegmentDetector(LSD_REFINE_NONE)`, which is a self-contained image-processing
-  algorithm rather than a model, and is intended to live in its own package. The ScaleLSD-side
-  half of that path — the field encoder the LSD segments feed — is already ported and verified.
-  Note that only the *direction* channel of the LSD field survives into the network's output;
-  see the discussion in `Sources/MLXScaleLSD/Decode/LineFieldEncoder.swift`.
 
 ## Documentation
 

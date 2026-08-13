@@ -25,8 +25,20 @@ public struct HATField {
     public var width: Int { angles.dim(2) }
 
     /// Split and activate a raw `(B, H, W, 9)` network output.
-    public init(rawOutput output: MLXArray) {
-        self.angles = sigmoid(output[.ellipsis, ..<3])
+    ///
+    /// - Parameters:
+    ///   - output: the raw network output.
+    ///   - directionOverride: an externally computed direction field, `(B, H, W, 1)` normalised
+    ///     to `0...1`, replacing the network's own angle channel 0. This is the LSD-rectifier
+    ///     path: upstream substitutes the LSD field's direction and keeps everything else from
+    ///     the network. See ``LineFieldEncoder``.
+    public init(rawOutput output: MLXArray, directionOverride: MLXArray? = nil) {
+        if let directionOverride {
+            self.angles = concatenated(
+                [directionOverride, sigmoid(output[.ellipsis, 1 ..< 3])], axis: -1)
+        } else {
+            self.angles = sigmoid(output[.ellipsis, ..<3])
+        }
         self.distance = sigmoid(output[.ellipsis, 3 ..< 4])
         // Upstream takes softmax over the 2 logits and keeps the positive class.
         self.junctionHeatmap = softmax(output[.ellipsis, 5 ..< 7], axis: -1)[.ellipsis, 1 ..< 2]

@@ -25,6 +25,11 @@ struct ModelOptions: ParsableArguments {
     @Flag(name: .customLong("use-nms"), help: "Apply 3x3 NMS to the junction heatmap.")
     var useNMS = false
 
+    @Flag(
+        name: .customLong("use-lsd"),
+        help: "Take segment direction from classical LSD instead of the network.")
+    var useLSD = false
+
     @Option(help: "Square resolution the image is resized to before inference.")
     var inputSize: Int = 512
 
@@ -34,7 +39,8 @@ struct ModelOptions: ParsableArguments {
             decoder: DecoderOptions(
                 junctionThreshold: junctionThreshold,
                 maximumJunctions: numJunctions,
-                useNMS: useNMS))
+                useNMS: useNMS),
+            useLSD: useLSD)
     }
 }
 

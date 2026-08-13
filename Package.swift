@@ -27,10 +27,10 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.3")),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
-        // TODO(lsd): the `--use-lsd` rectifier path needs a line-segment detector matching
-        // OpenCV's `createLineSegmentDetector(LSD_REFINE_NONE)`. It is a self-contained
-        // image-processing algorithm with no MLX dependency, so it lives in its own package
-        // (`../swift-lsd`). Wired in once that package is implemented.
+        // The `--use-lsd` rectifier path needs a line-segment detector matching OpenCV's
+        // `createLineSegmentDetector(LSD_REFINE_NONE)`. It is a self-contained image-processing
+        // algorithm with no MLX dependency, so it lives in its own package.
+        .package(path: "../swift-lsd"),
     ],
     targets: [
         .target(
@@ -38,6 +38,7 @@ let package = Package(
             dependencies: [
                 .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "LSD", package: "swift-lsd"),
             ],
             exclude: isDocumentationBuild ? [] : ["Documentation.docc"],
             swiftSettings: [.swiftLanguageMode(.v6)]
@@ -47,6 +48,7 @@ let package = Package(
             dependencies: [
                 "MLXScaleLSD",
                 .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "LSD", package: "swift-lsd"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]

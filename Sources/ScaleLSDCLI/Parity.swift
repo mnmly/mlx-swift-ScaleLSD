@@ -5,6 +5,7 @@
 
 import ArgumentParser
 import Foundation
+import LSD
 import MLX
 import MLXScaleLSD
 
@@ -120,6 +121,46 @@ struct Parity: AsyncParsableCommand {
                 pad("preprocess", 12) + pad("\(input.shape)", 24)
                     + scientific(relative) + " " + scientific(difference.mean().item(Float.self))
                     + " " + (ok ? "ok" : "FAIL"))
+        }
+
+        // ---- classical LSD detector -----------------------------------------
+        // Run swift-lsd on the *reference* preprocessed tensor, so this measures the detector
+        // alone rather than the detector plus this port's preprocessing.
+        if let lsdLines = reference["lsd_lines"] {
+            let size = input.dim(1)
+            let bytes = input.asArray(Float.self).map { value -> UInt8 in
+                UInt8(Swift.max(0, Swift.min(255, Int(value * 255))))
+            }
+            let found = LSDDetector.detect(grayscale: bytes, width: size, height: input.dim(2))
+            let expected = lsdLines.asArray(Float.self)
+            let expectedCount = lsdLines.dim(0)
+            var matched = 0
+            for segment in found {
+                var best = Float.greatestFiniteMagnitude
+                for index in 0 ..< expectedCount {
+                    let base = index * 4
+                    // Endpoint order is not meaningful, so try both pairings.
+                    let forward = Swift.max(
+                        Swift.max(Swift.abs(Float(segment.x1) - expected[base]),
+                                  Swift.abs(Float(segment.y1) - expected[base + 1])),
+                        Swift.max(Swift.abs(Float(segment.x2) - expected[base + 2]),
+                                  Swift.abs(Float(segment.y2) - expected[base + 3])))
+                    let reversed = Swift.max(
+                        Swift.max(Swift.abs(Float(segment.x2) - expected[base]),
+                                  Swift.abs(Float(segment.y2) - expected[base + 1])),
+                        Swift.max(Swift.abs(Float(segment.x1) - expected[base + 2]),
+                                  Swift.abs(Float(segment.y1) - expected[base + 3])))
+                    best = Swift.min(best, Swift.min(forward, reversed))
+                    if best == 0 { break }
+                }
+                if best <= 0.01 { matched += 1 }
+            }
+            print(
+                "\nclassical LSD (on the reference input, isolating preprocessing)")
+            print("  segments   swift \(found.count)  opencv \(expectedCount)")
+            print(
+                "  matched within 0.01 px: \(matched)/\(found.count) "
+                    + String(format: "(%.2f%%)", Float(matched) / Float(Swift.max(found.count, 1)) * 100))
         }
 
         // ---- LSD direction field (encodels port) ----------------------------

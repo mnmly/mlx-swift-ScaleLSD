@@ -6,6 +6,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import LSD
 import MLX
 
 /// Settings for a detection run.
@@ -14,10 +15,16 @@ public struct ScaleLSDOptions: Sendable, Equatable {
     public var inputSize: Int
     /// Junction and matching thresholds, applied during decode.
     public var decoder: DecoderOptions
+    /// Replace the network's predicted segment *direction* with one derived from classical LSD
+    /// (upstream's `--use_lsd` "LSD-rectifier"). Everything else still comes from the network.
+    public var useLSD: Bool
 
-    public init(inputSize: Int = 512, decoder: DecoderOptions = .default) {
+    public init(
+        inputSize: Int = 512, decoder: DecoderOptions = .default, useLSD: Bool = false
+    ) {
         self.inputSize = inputSize
         self.decoder = decoder
+        self.useLSD = useLSD
     }
 
     public static let `default` = ScaleLSDOptions()
@@ -109,6 +116,12 @@ public final class ScaleLSDSession: @unchecked Sendable {
     {
         let input = try ImageProcessing.networkInput(from: image, size: options.inputSize)
 
+        // The rectifier runs on the same tensor the network sees, quantised the way upstream
+        // does it (`np.array(x * 255, dtype=np.uint8)` — a truncation, not a round).
+        let direction: MLXArray? =
+            options.useLSD
+            ? lsdDirectionField(for: input, stride: configuration.stride) : nil
+
         let start = DispatchTime.now().uptimeNanoseconds
         let output = model(input)
         // Materialise inside the session so a frontend running off the main actor cannot
@@ -118,9 +131,32 @@ public final class ScaleLSDSession: @unchecked Sendable {
         let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
 
         return FieldHandle(
-            field: HATField(rawOutput: output),
+            field: HATField(rawOutput: output, directionOverride: direction),
             imageWidth: image.width, imageHeight: image.height,
             inferenceDuration: elapsed)
+    }
+
+    /// Detect segments with classical LSD and encode them as a direction field.
+    ///
+    /// Only the direction survives into the network's output — upstream overwrites the rest of
+    /// the LSD field with the network's own predictions — so nothing else is computed here.
+    /// See ``LineFieldEncoder``.
+    private func lsdDirectionField(for input: MLXArray, stride: Int) -> MLXArray? {
+        let size = input.dim(1)
+        eval(input)
+        let scaled = input.asArray(Float.self).map { value -> UInt8 in
+            UInt8(Swift.max(0, Swift.min(255, Int(value * 255))))  // truncate, as upstream does
+        }
+        let segments = LSDDetector.detect(grayscale: scaled, width: size, height: input.dim(2))
+        guard !segments.isEmpty else { return nil }
+
+        // LSD reports Double coordinates; MLX has no float64 on the GPU.
+        let flat = segments.flatMap {
+            [Float($0.x1), Float($0.y1), Float($0.x2), Float($0.y2)]
+        }
+        let grid = MLXArray(flat, [segments.count, 4]) / Float(stride)
+        return LineFieldEncoder.directionField(
+            segments: grid, height: size / stride, width: input.dim(2) / stride)
     }
 
     // MARK: - The cheap half
