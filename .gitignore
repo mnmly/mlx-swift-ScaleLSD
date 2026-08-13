@@ -1,0 +1,14 @@
+.DS_Store
+.build/
+.xcdd/
+.dd/
+build/
+*.xcuserdatad
+xcuserdata/
+.swiftpm/
+Scripts/__pycache__/
+Scripts/refenv/
+*.safetensors
+*.pt
+temp_output/
+default.profraw
