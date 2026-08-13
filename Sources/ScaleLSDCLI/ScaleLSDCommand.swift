@@ -9,6 +9,6 @@ struct ScaleLSDCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "scalelsd",
         abstract: "Detect line segments with ScaleLSD on Apple Silicon.",
-        subcommands: [Detect.self, Bench.self, Parity.self]
+        subcommands: [Detect.self, Bench.self, Fetch.self, Parity.self]
     )
 }

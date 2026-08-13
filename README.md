@@ -24,7 +24,17 @@ released checkpoints: see [docs/PARITY.md](docs/PARITY.md).
 
 ## Weights
 
-The upstream checkpoints are PyTorch pickles, which MLX cannot read. Convert one first:
+Converted weights are published at
+[**mnmly/scalelsd-mlx**](https://huggingface.co/mnmly/scalelsd-mlx) and download on first use:
+
+```bash
+scalelsd fetch --variant v2      # or from Swift: try await ModelStore.download(.v2)
+```
+
+The demo app's **Download Weights** button does the same thing.
+
+To convert a checkpoint yourself instead — the upstream files are PyTorch pickles, which MLX
+cannot read:
 
 ```bash
 # grab a checkpoint from https://huggingface.co/cherubicxn/scalelsd
@@ -45,7 +55,8 @@ only architectural difference is LayerScale, which the converter records in `con
 ```swift
 import MLXScaleLSD
 
-let session = try ScaleLSDSession.load(directory: modelDirectory)
+let directory = try await ModelStore.download(.v2)   // cached after the first call
+let session = try ScaleLSDSession.load(directory: directory)
 let image = try ScaleLSDSession.loadImage(at: imageURL)
 let result = try session.detect(image)
 
@@ -77,6 +88,7 @@ xcodebuild -scheme scalelsd -destination 'platform=macOS' \
 `detect` mirrors `predictor/predict.py`: `--threshold`, `--junction-hm`, `--num-junctions`,
 `--use-nms`, and `--ext png|json`. There are two more subcommands:
 
+- `scalelsd fetch` — download converted weights into the local cache.
 - `scalelsd bench` — throughput plus a leak check that watches `MLX.Memory.activeMemory`.
 - `scalelsd parity` — stage-by-stage comparison against PyTorch fixtures.
 
@@ -95,7 +107,8 @@ Both frontends consume only `ScaleLSDSession`, so they cannot drift.
 
 ## Performance
 
-MacBook Pro (M2 Max), `assets/indoor.jpg` at 512×512, Release build, median of 20 runs:
+MacBook Pro (Apple M5 Max, 18 cores, 128 GB), `assets/indoor.jpg` at 512×512, Release build,
+median of 20 runs:
 
 | runtime | per image | vs this port |
 |---|---|---|
@@ -142,7 +155,11 @@ Not yet implemented:
 
 ## License
 
-This port is MIT-licensed. Upstream ScaleLSD is MIT — see `LICENSE.upstream-scalelsd`.
+This port is MIT-licensed. Upstream ScaleLSD source is MIT (Copyright © 2023 Nan Xue) — see
+`LICENSE.upstream-scalelsd`. The checkpoints are Apache-2.0, and the converted copies at
+[mnmly/scalelsd-mlx](https://huggingface.co/mnmly/scalelsd-mlx) are redistributed under that
+licence with attribution and a statement of the conversion changes. All model credit belongs to
+the ScaleLSD authors.
 
 ```bibtex
 @inproceedings{ScaleLSD,

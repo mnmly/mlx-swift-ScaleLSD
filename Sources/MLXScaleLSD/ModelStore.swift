@@ -4,9 +4,8 @@
 // output of Scripts/convert.py.
 //
 // NOTE: the upstream HuggingFace repo (`cherubicxn/scalelsd`) ships PyTorch `.pt` pickles,
-// which MLX cannot read. `ModelStore.repository` therefore points at a repo of *converted*
-// safetensors; publish one with Scripts/convert.py before the download path can work, or
-// point a frontend at a local directory instead.
+// which MLX cannot read. `defaultRepository` therefore points at a repo of *converted*
+// safetensors produced by Scripts/convert.py.
 
 import Foundation
 
@@ -35,7 +34,7 @@ public enum ModelStore {
     /// Default HuggingFace repository holding converted MLX weights.
     ///
     /// Pass a different one to ``download(_:repository:progress:)`` to override.
-    public static let defaultRepository = "mnmly/mlx-swift-scalelsd"
+    public static let defaultRepository = "mnmly/scalelsd-mlx"
 
     public static let requiredFiles = ["config.json", "model.safetensors"]
 
@@ -130,37 +129,86 @@ public enum ModelStore {
     private static func downloadFile(
         from url: URL, to destination: URL, progress: @Sendable @escaping (Double) -> Void
     ) async throws {
-        let (bytes, response) = try await URLSession.shared.bytes(from: url)
-        if let http = response as? HTTPURLResponse, !(200 ..< 300).contains(http.statusCode) {
-            throw DownloadError.badResponse(url, http.statusCode)
-        }
-        let total = response.expectedContentLength
+        // A `URLSession.bytes` loop awaits per byte, which caps throughput at a few MB/s —
+        // roughly six minutes for a 490 MB checkpoint. A download task streams to disk at
+        // link speed and reports progress through its delegate.
+        let coordinator = DownloadCoordinator(progress: progress)
+        let session = URLSession(
+            configuration: .default, delegate: coordinator, delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
 
-        // Stage in a temporary file so an interrupted download cannot leave a valid-looking
-        // model directory behind.
-        let staging = destination.appendingPathExtension("partial")
-        FileManager.default.createFile(atPath: staging.path, contents: nil)
-        let handle = try FileHandle(forWritingTo: staging)
+        let downloaded = try await coordinator.download(url, in: session)
 
-        var buffer = Data()
-        buffer.reserveCapacity(1 << 20)
-        var received: Int64 = 0
-        for try await byte in bytes {
-            buffer.append(byte)
-            received += 1
-            if buffer.count >= (1 << 20) {
-                try handle.write(contentsOf: buffer)
-                buffer.removeAll(keepingCapacity: true)
-                if total > 0 { progress(Double(received) / Double(total)) }
-            }
-        }
-        if !buffer.isEmpty { try handle.write(contentsOf: buffer) }
-        try handle.close()
-
+        // Stage under the final name so an interrupted download cannot leave a
+        // valid-looking model directory behind.
         if FileManager.default.fileExists(atPath: destination.path) {
             try FileManager.default.removeItem(at: destination)
         }
-        try FileManager.default.moveItem(at: staging, to: destination)
+        try FileManager.default.moveItem(at: downloaded, to: destination)
         progress(1.0)
+    }
+}
+
+/// Bridges `URLSessionDownloadTask` progress and completion into async/await.
+private final class DownloadCoordinator: NSObject, URLSessionDownloadDelegate, @unchecked Sendable
+{
+    private let progress: @Sendable (Double) -> Void
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<URL, Error>?
+
+    init(progress: @escaping @Sendable (Double) -> Void) {
+        self.progress = progress
+    }
+
+    func download(_ url: URL, in session: URLSession) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            lock.withLock { self.continuation = continuation }
+            session.downloadTask(with: url).resume()
+        }
+    }
+
+    private func finish(_ result: Result<URL, Error>) {
+        let pending = lock.withLock { () -> CheckedContinuation<URL, Error>? in
+            defer { continuation = nil }
+            return continuation
+        }
+        pending?.resume(with: result)
+    }
+
+    func urlSession(
+        _ session: URLSession, downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        guard totalBytesExpectedToWrite > 0 else { return }
+        progress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
+    }
+
+    func urlSession(
+        _ session: URLSession, downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
+        if let response = downloadTask.response as? HTTPURLResponse,
+            !(200 ..< 300).contains(response.statusCode)
+        {
+            finish(.failure(ModelStore.DownloadError.badResponse(
+                downloadTask.originalRequest?.url ?? location, response.statusCode)))
+            return
+        }
+        // `location` is deleted as soon as this callback returns, so claim it now.
+        let claimed = FileManager.default.temporaryDirectory
+            .appending(path: "scalelsd-\(UUID().uuidString)")
+        do {
+            try FileManager.default.moveItem(at: location, to: claimed)
+            finish(.success(claimed))
+        } catch {
+            finish(.failure(error))
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?
+    ) {
+        if let error { finish(.failure(error)) }
     }
 }
