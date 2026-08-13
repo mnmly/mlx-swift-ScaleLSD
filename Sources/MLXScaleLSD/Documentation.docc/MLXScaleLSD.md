@@ -29,6 +29,22 @@ for segment in result.segments(minimumScore: 10) {
 }
 ```
 
+### Vanishing points
+
+Detected segments can be grouped by the scene direction they converge on, which is what
+distinguishes a facade's horizontals from its verticals:
+
+```swift
+let segments = result.segments(minimumScore: 10)
+for vanishing in VanishingPointEstimator.estimate(segments: segments) {
+    // `nil` when the supporting lines are parallel — a vanishing point at infinity.
+    print(vanishing.imagePoint as Any, vanishing.supportingSegments.count)
+}
+```
+
+This is not part of upstream ScaleLSD — see ``VanishingPointEstimator`` for what it is and is
+not verified against.
+
 ### Separating the expensive half from the cheap half
 
 The forward pass dominates cost; re-thresholding does not. Two levels of reuse are exposed so a
@@ -54,6 +70,12 @@ decode faults later, on the detection task.
 - ``DetectionResult``
 - ``LineSegment``
 - ``Junction``
+
+### Grouping by scene direction
+
+- ``VanishingPoint``
+- ``VanishingPointEstimator``
+- ``VanishingPointOptions``
 
 ### Tuning the decoder
 

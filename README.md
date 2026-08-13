@@ -77,6 +77,26 @@ let loose = session.decode(field, options: .init(junctionThreshold: 0.004))
 let tight = session.decode(field, options: .init(junctionThreshold: 0.05, useNMS: true))
 ```
 
+## Vanishing points
+
+Segments can be grouped by the scene direction they converge on:
+
+```swift
+for vanishing in VanishingPointEstimator.estimate(segments: result.segments(minimumScore: 10)) {
+    print(vanishing.imagePoint as Any, vanishing.supportingSegments.count)
+}
+```
+
+or `scalelsd detect --vanishing-points`, which colours each segment by its group and lists the
+points it found. The demo app has a toggle for the same thing.
+
+Unlike everything else here this is **not a port** — upstream ScaleLSD ships no vanishing-point
+code, and the results on its project page come from Progressive-X, a separate library. This is an
+independent implementation of the standard approach (sequential RANSAC in homogeneous
+coordinates, with a least-squares refit), verified against synthetic scenes with known vanishing
+points rather than against a reference. Points at infinity are represented properly, so
+head-on parallel lines are handled rather than blowing up.
+
 ## Command line
 
 ```bash
@@ -145,6 +165,7 @@ Implemented and verified:
 - DPT-hybrid backbone (ResNetV2 stages + ViT-B/16 with optional LayerScale), DPT reassemble /
   refinenet neck, 9-channel multitask head.
 - HAT-field decode, junction NMS + top-k, wireframe matching.
+- Vanishing-point estimation (an addition, not a port — see above).
 - `encodels` line-to-field encoder (the CUDA extension upstream), matching a scalar reference
   to 1.2e-07.
 - The `--use-lsd` rectifier path, via [swift-lsd](../swift-lsd) — an independent implementation

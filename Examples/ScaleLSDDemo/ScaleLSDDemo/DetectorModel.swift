@@ -43,8 +43,15 @@ final class DetectorModel {
         didSet { scheduleRedecode() }
     }
     var showJunctions = true
+    /// Group segments by the vanishing point they converge on.
+    var showVanishingPoints = false {
+        didSet { recomputeVanishingPoints() }
+    }
 
     private(set) var visibleSegments: [LineSegment] = []
+    private(set) var vanishingPoints: [VanishingPoint] = []
+    /// Parallel to ``visibleSegments``: index into ``vanishingPoints``, or -1 for unassigned.
+    private(set) var segmentGroups: [Int] = []
 
     private var session: ScaleLSDSession?
     private var field: FieldHandle?
@@ -61,9 +68,16 @@ final class DetectorModel {
         case .loadingModel: return "Loading model…"
         case .ready:
             guard let result else { return "Ready — open an image" }
-            return "\(visibleSegments.count) of \(result.segments.count) segments · "
+            var text =
+                "\(visibleSegments.count) of \(result.segments.count) segments · "
                 + "\(result.junctions.count) junctions · "
                 + String(format: "%.0f ms", inferenceDuration * 1000)
+            if showVanishingPoints {
+                text += vanishingPoints.isEmpty
+                    ? " · no vanishing points"
+                    : " · \(vanishingPoints.count) vanishing points"
+            }
+            return text
         case .detecting: return "Detecting…"
         case .failed(let message): return message
         }
@@ -196,6 +210,27 @@ final class DetectorModel {
     /// Cheap: array filter only.
     private func refilter() {
         visibleSegments = result?.segments(minimumScore: scoreThreshold) ?? []
+        recomputeVanishingPoints()
+    }
+
+    /// Vanishing points are derived from the *visible* segments, so they follow the score
+    /// threshold. Estimation is milliseconds on a few hundred segments — cheap enough to redo
+    /// on a slider drag, and far cheaper than the decode, let alone the network.
+    private func recomputeVanishingPoints() {
+        guard showVanishingPoints, !visibleSegments.isEmpty else {
+            vanishingPoints = []
+            segmentGroups = []
+            return
+        }
+        vanishingPoints = VanishingPointEstimator.estimate(segments: visibleSegments)
+
+        var groups = [Int](repeating: -1, count: visibleSegments.count)
+        for (index, vanishing) in vanishingPoints.enumerated() {
+            for segment in vanishing.supportingSegments where segment < groups.count {
+                groups[segment] = index
+            }
+        }
+        segmentGroups = groups
     }
 
     /// Cheaper than inference: re-runs the decoder against the retained field.

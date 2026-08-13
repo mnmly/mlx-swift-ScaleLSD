@@ -59,7 +59,8 @@ struct ContentView: View {
         ZStack {
             if let image = model.image {
                 WireframeView(
-                    image: image, segments: model.visibleSegments, junctions: model.junctions)
+                    image: image, segments: model.visibleSegments, junctions: model.junctions,
+                    groups: model.showVanishingPoints ? model.segmentGroups : [])
             } else {
                 EmptyStateView(model: model)
             }
@@ -124,6 +125,12 @@ struct WireframeView: View {
     let image: CGImage
     let segments: [LineSegment]
     let junctions: [Junction]
+    /// Parallel to `segments`: which vanishing point each supports, or -1. Empty to disable.
+    var groups: [Int] = []
+
+    /// Matches WireframeRenderer.Style.vanishingPointColors, so the on-screen overlay and an
+    /// exported PNG agree.
+    private static let groupColors: [Color] = [.red, .green, .blue, .yellow]
 
     var body: some View {
         GeometryReader { geometry in
@@ -141,19 +148,27 @@ struct WireframeView: View {
                     Image(decorative: image, scale: 1),
                     in: CGRect(origin: origin, size: drawn))
 
-                var path = Path()
-                for segment in segments {
-                    path.move(
-                        to: CGPoint(
+                // One path per colour so each is a single stroke.
+                var paths: [Int: Path] = [:]
+                for (index, segment) in segments.enumerated() {
+                    let group = index < groups.count ? groups[index] : -1
+                    paths[group, default: Path()].addLines([
+                        CGPoint(
                             x: origin.x + CGFloat(segment.x1) * scale,
-                            y: origin.y + CGFloat(segment.y1) * scale))
-                    path.addLine(
-                        to: CGPoint(
+                            y: origin.y + CGFloat(segment.y1) * scale),
+                        CGPoint(
                             x: origin.x + CGFloat(segment.x2) * scale,
-                            y: origin.y + CGFloat(segment.y2) * scale))
+                            y: origin.y + CGFloat(segment.y2) * scale),
+                    ])
                 }
-                context.stroke(
-                    path, with: .color(.orange), style: .init(lineWidth: 1.6, lineCap: .round))
+                for (group, path) in paths {
+                    let color =
+                        group < 0
+                        ? Color.orange
+                        : Self.groupColors[group % Self.groupColors.count]
+                    context.stroke(
+                        path, with: .color(color), style: .init(lineWidth: 1.6, lineCap: .round))
+                }
 
                 for junction in junctions {
                     let radius: CGFloat = 2
@@ -287,6 +302,14 @@ struct InspectorView: View {
                 Toggle("Non-maximum suppression", isOn: $model.useNMS)
                 Toggle("Show junctions", isOn: $model.showJunctions)
                 Text("Re-runs the decoder only, not the backbone.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Vanishing points") {
+                Toggle("Group by vanishing point", isOn: $model.showVanishingPoints)
+                Text("Colours each segment by the direction it converges on. Derived from the "
+                    + "visible segments, so it follows the score threshold.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

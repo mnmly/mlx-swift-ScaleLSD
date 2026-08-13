@@ -63,6 +63,11 @@ struct Detect: AsyncParsableCommand {
     @Option(help: "White wash over the source image in PNG output, 0...1.")
     var whiteBackground: Double = 0
 
+    @Flag(
+        name: [.customLong("vanishing-points"), .customShort("v")],
+        help: "Estimate vanishing points and colour segments by the one they support.")
+    var vanishingPoints = false
+
     func run() async throws {
         guard ["png", "json"].contains(ext) else {
             throw ValidationError("--ext must be png or json")
@@ -83,12 +88,17 @@ struct Detect: AsyncParsableCommand {
             let source = try ScaleLSDSession.loadImage(at: url)
             let result = try session.detect(source, options: options)
             let kept = result.segments(minimumScore: modelOptions.threshold)
+            // Indices in `supportingSegments` refer to `kept`, so estimate and render use it.
+            let vps =
+                vanishingPoints
+                ? VanishingPointEstimator.estimate(segments: kept) : []
 
             switch ext {
             case "png":
+                let style = WireframeRenderer.Style(whiteOverlay: CGFloat(whiteBackground))
                 let annotated = try WireframeRenderer.render(
                     image: source, segments: kept, junctions: result.junctions,
-                    style: .init(whiteOverlay: CGFloat(whiteBackground)))
+                    vanishingPoints: vps, style: style)
                 let destination = outputDirectory
                     .appending(path: url.deletingPathExtension().lastPathComponent)
                     .appendingPathExtension("png")
@@ -97,13 +107,24 @@ struct Detect: AsyncParsableCommand {
                 let destination = outputDirectory
                     .appending(path: url.deletingPathExtension().lastPathComponent)
                     .appendingPathExtension("json")
-                try WireframeJSON.write(result, keeping: kept, to: destination)
+                try WireframeJSON.write(
+                    result, keeping: kept, vanishingPoints: vps, to: destination)
             }
 
-            print(
+            var summary =
                 "\(url.lastPathComponent): \(kept.count) segments, "
-                    + "\(result.junctions.count) junctions, "
-                    + String(format: "%.3f s", result.inferenceDuration))
+                + "\(result.junctions.count) junctions, "
+                + String(format: "%.3f s", result.inferenceDuration)
+            if vanishingPoints {
+                let described = vps.map { vanishing -> String in
+                    let where_ = vanishing.imagePoint.map {
+                        String(format: "(%.0f, %.0f)", $0.x, $0.y)
+                    } ?? "at infinity"
+                    return "\(where_)x\(vanishing.supportingSegments.count)"
+                }
+                summary += "  vps: " + (described.isEmpty ? "none" : described.joined(separator: " "))
+            }
+            print(summary)
         }
         print("wrote \(inputs.count) result(s) to \(outputDirectory.path)")
     }
@@ -129,9 +150,10 @@ struct Detect: AsyncParsableCommand {
 
 /// The wireframe JSON upstream's `--ext json` writes.
 enum WireframeJSON {
-    static func write(_ result: DetectionResult, keeping segments: [LineSegment], to url: URL)
-        throws
-    {
+    static func write(
+        _ result: DetectionResult, keeping segments: [LineSegment],
+        vanishingPoints: [VanishingPoint] = [], to url: URL
+    ) throws {
         let payload: [String: Any] = [
             "width": result.imageWidth,
             "height": result.imageHeight,
@@ -140,6 +162,15 @@ enum WireframeJSON {
             "edges": segments.map { [$0.startJunction, $0.endJunction] },
             "edge_score": segments.map { $0.score },
             "lines": segments.map { [$0.x1, $0.y1, $0.x2, $0.y2] },
+            "vanishing_points": vanishingPoints.map { vanishing in
+                [
+                    // Homogeneous, so a point at infinity is representable.
+                    "homogeneous": [vanishing.x, vanishing.y, vanishing.w],
+                    "image_point": vanishing.imagePoint.map { [$0.x, $0.y] } as Any,
+                    "segments": vanishing.supportingSegments,
+                    "support": vanishing.support,
+                ] as [String: Any]
+            },
         ]
         let data = try JSONSerialization.data(
             withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])

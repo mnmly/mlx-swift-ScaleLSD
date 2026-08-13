@@ -23,22 +23,61 @@ public enum WireframeRenderer {
         public var vertexRadius: CGFloat
         /// White wash over the source image, as upstream's `--whitebg` does. 0 disables it.
         public var whiteOverlay: CGFloat
+        /// Colours used to distinguish vanishing-point groups, in order of dominance.
+        ///
+        /// Segments supporting no vanishing point keep ``edgeColor``.
+        public var vanishingPointColors: [CGColor]
 
         public init(
             edgeColor: CGColor = CGColor(red: 1.0, green: 0.647, blue: 0.0, alpha: 1.0),
             vertexColor: CGColor = CGColor(red: 0.0, green: 1.0, blue: 1.0, alpha: 1.0),
             lineWidth: CGFloat = 2.0,
             vertexRadius: CGFloat = 2.0,
-            whiteOverlay: CGFloat = 0
+            whiteOverlay: CGFloat = 0,
+            vanishingPointColors: [CGColor] = [
+                CGColor(red: 1.0, green: 0.23, blue: 0.19, alpha: 1),   // red
+                CGColor(red: 0.20, green: 0.78, blue: 0.35, alpha: 1),  // green
+                CGColor(red: 0.35, green: 0.56, blue: 1.0, alpha: 1),   // blue
+                CGColor(red: 1.0, green: 0.80, blue: 0.0, alpha: 1),    // yellow
+            ]
         ) {
             self.edgeColor = edgeColor
             self.vertexColor = vertexColor
             self.lineWidth = lineWidth
             self.vertexRadius = vertexRadius
             self.whiteOverlay = whiteOverlay
+            self.vanishingPointColors = vanishingPointColors
         }
 
         public static let `default` = Style()
+    }
+
+    /// Draw a wireframe with each segment coloured by the vanishing point it supports.
+    ///
+    /// - Parameters:
+    ///   - image: the source image.
+    ///   - segments: the *same* array that was handed to ``VanishingPointEstimator/estimate(segments:options:)``
+    ///     — a vanishing point's `supportingSegments` are indices into it, so passing a
+    ///     differently filtered array would mis-colour the result.
+    ///   - junctions: junctions to mark, or empty.
+    ///   - vanishingPoints: groups to colour by, most dominant first.
+    ///   - style: colours and weights.
+    public static func render(
+        image: CGImage,
+        segments: [LineSegment],
+        junctions: [Junction],
+        vanishingPoints: [VanishingPoint],
+        style: Style = .default
+    ) throws -> CGImage {
+        var colorBySegment: [Int: CGColor] = [:]
+        for (group, vanishing) in vanishingPoints.enumerated() {
+            guard !style.vanishingPointColors.isEmpty else { break }
+            let color = style.vanishingPointColors[group % style.vanishingPointColors.count]
+            for index in vanishing.supportingSegments { colorBySegment[index] = color }
+        }
+        return try render(
+            image: image, segments: segments, junctions: junctions, style: style,
+            colorBySegment: colorBySegment)
     }
 
     /// Draw `segments` and `junctions` over `image`.
@@ -49,7 +88,8 @@ public enum WireframeRenderer {
         image: CGImage,
         segments: [LineSegment],
         junctions: [Junction],
-        style: Style = .default
+        style: Style = .default,
+        colorBySegment: [Int: CGColor] = [:]
     ) throws -> CGImage {
         let width = image.width
         let height = image.height
@@ -71,14 +111,21 @@ public enum WireframeRenderer {
         context.translateBy(x: 0, y: CGFloat(height))
         context.scaleBy(x: 1, y: -1)
 
-        context.setStrokeColor(style.edgeColor)
         context.setLineWidth(style.lineWidth)
         context.setLineCap(.round)
-        for segment in segments {
-            context.move(to: CGPoint(x: CGFloat(segment.x1), y: CGFloat(segment.y1)))
-            context.addLine(to: CGPoint(x: CGFloat(segment.x2), y: CGFloat(segment.y2)))
+        // Stroke per colour group so each batch is a single path.
+        var byColor: [CGColor: [LineSegment]] = [:]
+        for (index, segment) in segments.enumerated() {
+            byColor[colorBySegment[index] ?? style.edgeColor, default: []].append(segment)
         }
-        context.strokePath()
+        for (color, group) in byColor {
+            context.setStrokeColor(color)
+            for segment in group {
+                context.move(to: CGPoint(x: CGFloat(segment.x1), y: CGFloat(segment.y1)))
+                context.addLine(to: CGPoint(x: CGFloat(segment.x2), y: CGFloat(segment.y2)))
+            }
+            context.strokePath()
+        }
 
         context.setFillColor(style.vertexColor)
         for junction in junctions {
