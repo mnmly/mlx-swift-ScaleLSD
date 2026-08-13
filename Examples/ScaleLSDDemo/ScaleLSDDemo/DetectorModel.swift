@@ -72,8 +72,12 @@ final class DetectorModel {
     // MARK: - Model
 
     func useExistingModelIfAvailable() {
+        // The container cache needs no grant, so prefer it; fall back to a folder the user
+        // picked on a previous launch, which does.
         if let existing = ModelStore.existingModelDirectory(for: variant) {
             load(directory: existing)
+        } else if let bookmarked = ModelStore.bookmarkedDirectory() {
+            load(directory: bookmarked, securityScoped: true)
         }
     }
 
@@ -88,14 +92,24 @@ final class DetectorModel {
         useExistingModelIfAvailable()
     }
 
-    func load(directory: URL) {
+    /// - Parameters:
+    ///   - directory: a model directory, or a folder containing one.
+    ///   - securityScoped: `true` for a URL the user picked or that came from a bookmark. The
+    ///     grant is held across the whole load — the session reads the weights off disk on a
+    ///     detached task, so releasing it once the panel closes would fault mid-load.
+    func load(directory: URL, securityScoped: Bool = false) {
+        let accessing = securityScoped && directory.startAccessingSecurityScopedResource()
+
         guard let resolved = ModelStore.resolveModelDirectory(pickedAt: directory) else {
+            if accessing { directory.stopAccessingSecurityScopedResource() }
+            if securityScoped { ModelStore.clearBookmark() }
             phase = .failed("No config.json + model.safetensors in \(directory.lastPathComponent)")
             return
         }
         work?.cancel()
         phase = .loadingModel
         work = Task {
+            defer { if accessing { directory.stopAccessingSecurityScopedResource() } }
             do {
                 // Loading is blocking and slow; keep it off the main actor.
                 let loaded = try await Task.detached(priority: .userInitiated) {

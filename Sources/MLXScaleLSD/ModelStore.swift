@@ -72,6 +72,52 @@ public enum ModelStore {
         return base.appending(path: "MLXScaleLSD").appending(path: variant.directoryName)
     }
 
+    // MARK: - Security-scoped bookmarks
+
+    private static let bookmarkKey = "MLXScaleLSD.modelDirectoryBookmark"
+
+    /// Persist access to a user-chosen model directory across launches.
+    ///
+    /// A sandboxed app only holds access to a folder the user picked for as long as that grant
+    /// lives; without a bookmark the choice is forgotten on relaunch. Call this while access is
+    /// still valid.
+    public static func saveBookmark(for url: URL) {
+        #if os(macOS)
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            let data = try? url.bookmarkData(
+                options: [.withSecurityScope], includingResourceValuesForKeys: nil,
+                relativeTo: nil)
+        #else
+            let data = try? url.bookmarkData()
+        #endif
+        guard let data else { return }
+        UserDefaults.standard.set(data, forKey: bookmarkKey)
+    }
+
+    /// The previously bookmarked model directory, if one was saved and still resolves.
+    ///
+    /// The returned URL is security-scoped: call `startAccessingSecurityScopedResource()` before
+    /// touching it and stop when done. Returns `nil` if the bookmark is stale or absent.
+    public static func bookmarkedDirectory() -> URL? {
+        guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
+        var stale = false
+        #if os(macOS)
+            let url = try? URL(
+                resolvingBookmarkData: data, options: [.withSecurityScope], relativeTo: nil,
+                bookmarkDataIsStale: &stale)
+        #else
+            let url = try? URL(
+                resolvingBookmarkData: data, relativeTo: nil, bookmarkDataIsStale: &stale)
+        #endif
+        return stale ? nil : url
+    }
+
+    /// Forget a saved bookmark, e.g. after it fails to resolve to a model.
+    public static func clearBookmark() {
+        UserDefaults.standard.removeObject(forKey: bookmarkKey)
+    }
+
     /// An already-downloaded copy of `variant`, if present.
     public static func existingModelDirectory(for variant: Variant) -> URL? {
         let cached = cacheDirectory(for: variant)

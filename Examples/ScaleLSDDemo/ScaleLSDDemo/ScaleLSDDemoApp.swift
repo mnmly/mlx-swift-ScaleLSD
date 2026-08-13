@@ -240,7 +240,10 @@ struct EmptyStateView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
-            model.load(directory: url)
+            // Persist the grant now, while the panel's access is still live, so the choice
+            // survives relaunch. Sandboxed apps otherwise forget it immediately.
+            ModelStore.saveBookmark(for: url)
+            model.load(directory: url, securityScoped: true)
         }
     }
 }

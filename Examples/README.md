@@ -47,6 +47,13 @@ All the work happens in `ScaleLSDSession`; the app owns nothing but presentation
 the file-access grant. It bakes dropped images to pixels immediately — a lazily decoded
 `CGImage` would fault later, on the detection task, once the drag grant has lapsed.
 
+### Choosing a folder outside the container
+
+"Choose Folder…" saves a security-scoped bookmark, so the choice survives relaunch — a
+sandboxed app is otherwise granted access only for the life of the panel's grant and forgets it
+immediately. The grant is held across the whole load, because the session reads the weights off
+disk on a detached task; releasing it when the panel closes would fault mid-load.
+
 ### Entitlements
 
 `com.apple.security.network.client` for the weight download, and
