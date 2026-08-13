@@ -1,0 +1,42 @@
+# Generated with `xcodegen generate` (see Examples/README.md).
+#
+# The app depends on the package by relative path, so it always builds against the working
+# tree rather than a published version.
+
+name: ScaleLSDDemo
+
+options:
+  bundleIdPrefix: com.mnmly
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+
+packages:
+  mlx-swift-ScaleLSD:
+    path: ../..
+
+targets:
+  ScaleLSDDemo:
+    type: application
+    platform: macOS
+    sources:
+      - path: ScaleLSDDemo
+    dependencies:
+      - package: mlx-swift-ScaleLSD
+        product: MLXScaleLSD
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mnmly.ScaleLSDDemo
+        PRODUCT_NAME: ScaleLSDDemo
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        INFOPLIST_KEY_NSMainStoryboardFile: ""
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        CODE_SIGN_ENTITLEMENTS: ScaleLSDDemo/ScaleLSDDemo.entitlements
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: YES
+        CODE_SIGNING_ALLOWED: YES

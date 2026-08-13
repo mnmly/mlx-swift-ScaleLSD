@@ -22,15 +22,8 @@ struct ScaleLSDDemoApp: App {
     }
 }
 
-/// The demo ships as a SwiftPM executable rather than an `.app`, so it starts life as a
-/// background-only process with no window. Promoting it to a regular app gives it a Dock icon,
-/// a menu bar and a visible window.
+/// Single-window app: quitting with the window is the expected behaviour for a demo.
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
 

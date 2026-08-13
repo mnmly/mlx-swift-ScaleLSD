@@ -98,9 +98,10 @@ xcodebuild -scheme scalelsd -destination 'platform=macOS' \
 the thresholds, download weights from within the app:
 
 ```bash
-xcodebuild -scheme ScaleLSDDemo -destination 'platform=macOS' \
-    -configuration Release -derivedDataPath .xcdd build
-.xcdd/Build/Products/Release/ScaleLSDDemo
+cd Examples/ScaleLSDDemo
+xcodebuild -project ScaleLSDDemo.xcodeproj -scheme ScaleLSDDemo \
+    -configuration Release -derivedDataPath .dd build
+open .dd/Build/Products/Release/ScaleLSDDemo.app
 ```
 
 Both frontends consume only `ScaleLSDSession`, so they cannot drift.

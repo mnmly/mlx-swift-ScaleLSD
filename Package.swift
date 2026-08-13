@@ -22,7 +22,6 @@ let package = Package(
     products: [
         .library(name: "MLXScaleLSD", targets: ["MLXScaleLSD"]),
         .executable(name: "scalelsd", targets: ["ScaleLSDCLI"]),
-        .executable(name: "ScaleLSDDemo", targets: ["ScaleLSDDemo"]),
     ],
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.3")),
@@ -53,15 +52,8 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        // SwiftUI demo. Lives under Examples/ but is declared as an executable target rather
-        // than a separate .xcodeproj, so it builds with the same `xcodebuild -scheme`
-        // invocation as the CLI and cannot silently stop compiling against the library.
-        .executableTarget(
-            name: "ScaleLSDDemo",
-            dependencies: ["MLXScaleLSD"],
-            path: "Examples/ScaleLSDDemo",
-            swiftSettings: [.swiftLanguageMode(.v6)]
-        ),
+        // The SwiftUI demo is an Xcode project under Examples/, not an SPM target — it needs
+        // a bundle, entitlements and the app sandbox. See Examples/README.md.
         .testTarget(
             name: "MLXScaleLSDTests",
             dependencies: ["MLXScaleLSD"],

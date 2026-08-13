@@ -14,7 +14,13 @@ bundle. Always:
 ```bash
 swift build -c release                                                  # library + CLI
 xcodebuild -scheme mlx-swift-ScaleLSD-Package -destination 'platform=macOS' test
+(cd Examples/ScaleLSDDemo && xcodebuild -project ScaleLSDDemo.xcodeproj \
+    -scheme ScaleLSDDemo -configuration Release -derivedDataPath .dd build)
 ```
+
+The demo is an Xcode project, not an SPM target, so `swift build` does **not** cover it — build
+it explicitly after changing any public API. Its project file is generated from `project.yml`
+by XcodeGen; edit the YAML, not the `.pbxproj`.
 
 Confirm the scheme name with `xcodebuild -list` rather than guessing it.
 
