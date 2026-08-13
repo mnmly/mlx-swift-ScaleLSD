@@ -4,6 +4,8 @@
 ported to Apple Silicon via [mlx-swift](https://github.com/ml-explore/mlx-swift).
 Inference only.
 
+📖 [API documentation](https://mnmly.github.io/mlx-swift-ScaleLSD/)
+
 The port reproduces the reference graph stage by stage and is verified against PyTorch on both
 released checkpoints: see [docs/PARITY.md](docs/PARITY.md).
 
@@ -154,7 +156,9 @@ Implemented and verified:
 
 ## Documentation
 
-`MLXScaleLSD` ships DocC reference docs for every public symbol:
+📖 **[Published API reference](https://mnmly.github.io/mlx-swift-ScaleLSD/)**
+
+`MLXScaleLSD` ships DocC reference docs for every public symbol. To build them locally:
 
 ```bash
 ./Scripts/build_docs.sh            # static site into docs/MLXScaleLSD/
