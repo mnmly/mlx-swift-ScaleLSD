@@ -45,10 +45,12 @@ cd "$(dirname "$0")/.."
 export SPI_GENERATE_DOCS=1
 
 TARGETS="${TARGETS:-MLXScaleLSD}"
-HOSTING_BASE_PATH="${HOSTING_BASE_PATH:-mlx-swift-ScaleLSD}"
+HOSTING_BASE_PATH="${HOSTING_BASE_PATH:-mlx-swift-ScaleLSD/api}"
 REPO_URL="${REPO_URL:-https://github.com/mnmly/mlx-swift-ScaleLSD}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
-OUTPUT_DIR="${OUTPUT_DIR:-docs}"
+# Generated site goes in a subdirectory: the script does `rm -rf "$OUTPUT_DIR"`,
+# which would otherwise delete hand-written docs like docs/PARITY.md.
+OUTPUT_DIR="${OUTPUT_DIR:-docs/api}"
 
 # Toolchain selection. The experimental Markdown flags require a recent swift-docc
 # (newer than the one bundled with current Xcode). Let callers point at one without

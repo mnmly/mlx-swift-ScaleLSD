@@ -13,8 +13,6 @@ Scripts/refenv/
 temp_output/
 default.profraw
 
-# DocC output (docs/PARITY.md is hand-written and stays tracked)
-docs/MLXScaleLSD/
-docs/index.html
-docs/llms.txt
-docs/data/
+# DocC output. It lives under docs/api/ so the generated-site wipe cannot touch
+# hand-written docs like docs/PARITY.md.
+docs/api/
