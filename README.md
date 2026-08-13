@@ -112,12 +112,13 @@ median of 20 runs:
 
 | runtime | per image | vs this port |
 |---|---|---|
-| **mlx-swift (this port)** | **57 ms** | — |
-| PyTorch 2.13, MPS | 88 ms | 1.5× slower |
-| PyTorch 2.13, CPU | 652 ms | 11× slower |
+| **mlx-swift (this port)** | **47 ms** | — |
+| PyTorch 2.13, MPS | 88 ms | 1.9× slower |
+| PyTorch 2.13, CPU | 652 ms | 14× slower |
 
-`scalelsd bench` also confirms active memory is flat (467.4 MB, 0.0 MB growth over 20
-iterations). The much larger "peak" figure is MLX's reusable buffer cache, not a leak.
+Split: 39 ms preprocessing + forward, 9 ms wireframe decode. `scalelsd bench` reports the split
+and confirms active memory is flat (467 MB, 0.0 MB growth over 20 iterations). The much larger
+"peak" figure is MLX's reusable buffer cache, not a leak.
 
 ## Accuracy
 
@@ -130,8 +131,9 @@ Final HAT field matches PyTorch to **1.1e-05** (v1) / **1.4e-05** (v2) relative.
 | segments within 0.01 px | 1879/1880 | 1581/1590 |
 
 Detections are not bit-exact by construction: the 512-junction cap and the nearest-junction
-assignment are discrete choices that a sub-noise perturbation can flip. [docs/PARITY.md](docs/PARITY.md)
-explains both, with measurements.
+assignment are discrete choices that a sub-noise perturbation can flip. Preprocessing also
+differs from `cv2` by ~1.4% because the reference pipeline is 8-bit throughout.
+[docs/PARITY.md](docs/PARITY.md) explains all three, with measurements.
 
 ## Status
 
@@ -152,6 +154,17 @@ Not yet implemented:
   half of that path — the field encoder the LSD segments feed — is already ported and verified.
   Note that only the *direction* channel of the LSD field survives into the network's output;
   see the discussion in `Sources/MLXScaleLSD/Decode/LineFieldEncoder.swift`.
+
+## Documentation
+
+`MLXScaleLSD` ships DocC reference docs for every public symbol:
+
+```bash
+./Scripts/build_docs.sh            # static site into docs/MLXScaleLSD/
+./Scripts/build_docs.sh preview    # local server with live reload
+```
+
+`docs/PARITY.md` is the hand-written companion covering verification methodology.
 
 ## License
 

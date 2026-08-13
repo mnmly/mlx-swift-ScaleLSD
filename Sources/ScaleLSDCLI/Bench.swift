@@ -59,6 +59,24 @@ struct Bench: AsyncParsableCommand {
             }
         }
 
+        // Phase breakdown: analyze() covers preprocessing + forward + eval; decode() is the
+        // wireframe post-processing. Timed separately so it is obvious which half to optimise.
+        var analyzeTimes: [Double] = []
+        var decodeTimes: [Double] = []
+        for _ in 0 ..< iterations {
+            try autoreleasepool {
+                let a = DispatchTime.now().uptimeNanoseconds
+                let handle = try session.analyze(source, options: options)
+                let b = DispatchTime.now().uptimeNanoseconds
+                _ = session.decode(handle, options: options.decoder)
+                let c = DispatchTime.now().uptimeNanoseconds
+                analyzeTimes.append(Double(b - a) / 1e9)
+                decodeTimes.append(Double(c - b) / 1e9)
+            }
+        }
+        analyzeTimes.sort()
+        decodeTimes.sort()
+
         let activeAtEnd = MLX.Memory.activeMemory
         let sorted = durations.sorted()
         let mean = durations.reduce(0, +) / Double(durations.count)
@@ -70,6 +88,8 @@ struct Bench: AsyncParsableCommand {
         print("mean         \(String(format: "%.3f s", mean))  (\(String(format: "%.2f", 1 / mean)) it/s)")
         print("median       \(String(format: "%.3f s", sorted[sorted.count / 2]))")
         print("min / max    \(String(format: "%.3f", sorted.first!)) / \(String(format: "%.3f", sorted.last!)) s")
+        print("analyze      \(String(format: "%.3f s", analyzeTimes[analyzeTimes.count / 2])) median (preprocess + forward)")
+        print("decode       \(String(format: "%.3f s", decodeTimes[decodeTimes.count / 2])) median (junctions + matching)")
         print("")
         print("active memory after warmup  \(megabytes(activeAfterWarmup))")
         print("active memory at end        \(megabytes(activeAtEnd))")

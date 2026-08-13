@@ -54,3 +54,25 @@ Two upstream details bite:
   *asymmetric* SAME padding. Getting the padding split wrong shifts every downstream feature.
 - `_resize_pos_embed` bilinearly resizes the 24×24 pretrained position grid to H/16 × W/16
   **without** `align_corners`, and keeps the cls-token row untouched.
+
+
+## Documentation
+
+`MLXScaleLSD` ships DocC-generated reference docs (`Sources/MLXScaleLSD/Documentation.docc/`,
+built by `Scripts/build_docs.sh`). **`///` comments on public/`open` symbols are published**, so
+treat them as shipped surface rather than internal hints.
+
+When you add or modify a `public` or `open` declaration:
+
+- Write a `///` comment. One-sentence summary, then a paragraph when the *why* is non-obvious.
+  Don't restate what the signature already says.
+- Document each parameter with `- Parameter name:` — use the **internal** name when there is an
+  external label (`- key:`, not `- forKey:`), or DocC warns.
+- Cross-reference with double-backticks, e.g. ``` ``ScaleLSDSession/analyze(_:options:)`` ```.
+  The syntax is signature-sensitive: `foo(_:)` and `foo(_:_:)` are different symbols.
+- File new top-level symbols under a `## Topics` group in
+  `Sources/MLXScaleLSD/Documentation.docc/MLXScaleLSD.md`. Groups are organised by *user task*;
+  there is deliberately no uncurated "Classes" bucket, so an unfiled type shows up as a warning.
+- Keep the `PORT FROM:` header comments accurate — they are the map back to the Python source.
+
+Verify with `./Scripts/build_docs.sh` and expect no warnings on user-authored prose.

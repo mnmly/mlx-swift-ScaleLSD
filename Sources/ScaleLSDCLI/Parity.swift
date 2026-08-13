@@ -25,6 +25,11 @@ struct Parity: AsyncParsableCommand {
     @Flag(help: "Also report interior-only error, isolating padding bugs from precision.")
     var detail = false
 
+    @Option(
+        name: [.customShort("i"), .long],
+        help: "Source image, to also check preprocessing against the reference tensor.")
+    var image: String?
+
     func run() async throws {
         // MLX runs fp32 matmuls at TF32 by default (~1e-3 relative); parity needs it off.
         if ProcessInfo.processInfo.environment["MLX_ENABLE_TF32"] != "0" {
@@ -94,6 +99,27 @@ struct Parity: AsyncParsableCommand {
                 line += "   interior=" + String(format: "%.3e", interiorRel)
             }
             print(line)
+        }
+
+        // ---- preprocessing --------------------------------------------------
+        // The fixtures store the *already preprocessed* tensor, so the stage comparison below
+        // never exercises grayscale conversion or the resize. Check them explicitly when a
+        // source image is supplied, otherwise a preprocessing regression is invisible here.
+        if let image {
+            let decoded = try ScaleLSDSession.loadImage(at: URL(filePath: image))
+            let produced = try ImageProcessing.networkInput(from: decoded, size: input.dim(1))
+            let difference = abs(produced - input)
+            let relative =
+                (difference.max() / maximum(abs(input).max(), MLXArray(Float(1e-12))))
+                .item(Float.self)
+            // cv2 resizes 8-bit with fixed-point arithmetic, so exact equality is not expected;
+            // this is a regression guard on the order of a quantisation step.
+            let ok = relative <= 0.02
+            if !ok { failures += 1 }
+            print(
+                pad("preprocess", 12) + pad("\(input.shape)", 24)
+                    + scientific(relative) + " " + scientific(difference.mean().item(Float.self))
+                    + " " + (ok ? "ok" : "FAIL"))
         }
 
         // ---- LSD direction field (encodels port) ----------------------------

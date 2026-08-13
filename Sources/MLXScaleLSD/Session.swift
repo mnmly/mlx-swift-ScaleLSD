@@ -100,7 +100,10 @@ public final class ScaleLSDSession: @unchecked Sendable {
 
     /// Run the network and retain its HAT field.
     ///
-    /// - Parameter image: fully decoded pixels. See ``ImageProcessing/bakedCopy(of:)``.
+    /// - Parameters:
+    ///   - image: fully decoded pixels. See ``ImageProcessing/bakedCopy(of:)``.
+    ///   - options: input resolution and decoder thresholds; only the resolution affects this
+    ///     call, the thresholds are carried through for ``detect(_:options:)``.
     public func analyze(_ image: CGImage, options: ScaleLSDOptions = .default) throws
         -> FieldHandle
     {

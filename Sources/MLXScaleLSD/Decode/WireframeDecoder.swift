@@ -162,18 +162,24 @@ public enum WireframeDecoder {
         }
         let junctionArray = MLXArray(coordinates, [junctionCount, 2])
 
-        let (startIndex, startDistance) = nearest(
-            points: proposals[0..., ..<2], junctions: junctionArray)
-        let (endIndex, endDistance) = nearest(
-            points: proposals[0..., 2...], junctions: junctionArray)
+        // Both endpoints in one pass: stacking them halves the kernel launches and lets a
+        // single eval cover the whole search. The first `proposalCount` results are the start
+        // endpoints and the rest are the end endpoints, addressed by offset rather than by
+        // slicing — an `ArraySlice`'s indices stay in the parent's coordinate space.
+        let proposalCount = proposals.dim(0)
+        let (indices, distances) = nearest(
+            points: concatenated([proposals[0..., ..<2], proposals[0..., 2...]], axis: 0),
+            junctions: junctionArray)
 
         // Tally votes per unordered junction pair.
         var votes: [Int: Int] = [:]
         votes.reserveCapacity(4096)
-        for i in startIndex.indices {
-            guard startDistance[i] < threshold, endDistance[i] < threshold else { continue }
-            let a = Int(startIndex[i])
-            let b = Int(endIndex[i])
+        for i in 0 ..< proposalCount {
+            guard distances[i] < threshold, distances[proposalCount + i] < threshold else {
+                continue
+            }
+            let a = Int(indices[i])
+            let b = Int(indices[proposalCount + i])
             guard a != b else { continue }  // both endpoints snapped to one junction
             let key = min(a, b) * junctionCount + max(a, b)
             votes[key, default: 0] += 1
@@ -194,27 +200,29 @@ public enum WireframeDecoder {
         points: MLXArray, junctions: MLXArray
     ) -> (indices: [Int32], distances: [Float]) {
         let total = points.dim(0)
-        let chunkSize = 4096
-        var indices: [Int32] = []
-        var distances: [Float] = []
-        indices.reserveCapacity(total)
-        distances.reserveCapacity(total)
+        let chunkSize = 8192
+        var indexChunks: [MLXArray] = []
+        var distanceChunks: [MLXArray] = []
 
         var offset = 0
         while offset < total {
             let upper = Swift.min(offset + chunkSize, total)
             let chunk = points[offset ..< upper]
-            // (J, chunk, 2) -> (J, chunk)
+            // (J, chunk, 2) -> (J, chunk). Chunked because the full cost matrix would be
+            // ~270 MB at 512 junctions over both endpoints of a 256×256 field.
             let delta = chunk.expandedDimensions(axis: 0) - junctions.expandedDimensions(axis: 1)
             let cost = (delta * delta).sum(axis: -1)
 
-            let bestIndex = argMin(cost, axis: 0)
-            let bestDistance = cost.min(axis: 0)
-            eval(bestIndex, bestDistance)
-            indices.append(contentsOf: bestIndex.asArray(Int32.self))
-            distances.append(contentsOf: bestDistance.asArray(Float.self))
+            indexChunks.append(argMin(cost, axis: 0))
+            distanceChunks.append(cost.min(axis: 0))
             offset = upper
         }
-        return (indices, distances)
+
+        // Build the whole graph first and evaluate once. Evaluating per chunk turned this into
+        // dozens of sync points, which dominated post-processing.
+        let allIndices = concatenated(indexChunks, axis: 0)
+        let allDistances = concatenated(distanceChunks, axis: 0)
+        eval(allIndices, allDistances)
+        return (allIndices.asArray(Int32.self), allDistances.asArray(Float.self))
     }
 }

@@ -12,3 +12,9 @@ Scripts/refenv/
 *.pt
 temp_output/
 default.profraw
+
+# DocC output (docs/PARITY.md is hand-written and stays tracked)
+docs/MLXScaleLSD/
+docs/index.html
+docs/llms.txt
+docs/data/
