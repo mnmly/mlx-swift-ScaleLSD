@@ -29,7 +29,7 @@ let package = Package(
         // The `--use-lsd` rectifier path needs a line-segment detector matching OpenCV's
         // `createLineSegmentDetector(LSD_REFINE_NONE)`. It is a self-contained image-processing
         // algorithm with no MLX dependency, so it lives in its own package.
-        .package(path: "../swift-lsd"),
+        .package(url: "https://github.com/mnmly/swift-lsd", from: "0.1.0"),
     ],
     targets: [
         .target(

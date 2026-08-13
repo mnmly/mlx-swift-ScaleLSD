@@ -1,0 +1,66 @@
+# .github/workflows/docs.yml
+#
+# Builds DocC on push to main and deploys to GitHub Pages.
+#
+# ONE-TIME SETUP (the workflow's deploy step fails with HttpError: Not Found
+# until this is done — Pages must be enabled on the repo first):
+#
+#   gh api -X POST repos/<owner>/<repo>/pages -f build_type=workflow
+#
+# or in the UI: Settings → Pages → Source → "GitHub Actions". After that the
+# next push to main (or a manual rerun) will deploy.
+#
+# Replace DOCC_TARGET and HOSTING_BASE_PATH to match your package.
+
+name: Build and deploy DocC
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Pick a runner image whose default Xcode matches your package's minimum
+    # platform versions. macos-14 ships Xcode 15.x, macos-15 ships Xcode 16.x,
+    # macos-26 ships Xcode 26.x. Use the default toolchain rather than
+    # hard-pinning an `Xcode_XX.app` path — those paths change per runner
+    # image (e.g. `Xcode_26.app` does not exist on macos-26) and break
+    # silently when the image is updated.
+    runs-on: macos-15
+    env:
+      DOCC_TARGET: MLXScaleLSD
+      HOSTING_BASE_PATH: mlx-swift-ScaleLSD/api
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Build docs
+        run: ./Scripts/build_docs.sh
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
