@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1D07E608805D28C08783F1DF /* MLXScaleLSD in Frameworks */ = {isa = PBXBuildFile; productRef = 92284A688C13DC56758BECF6 /* MLXScaleLSD */; };
+		2A14D7D276C8F53407BBC1CC /* LookAroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11934AF23A371219926A037 /* LookAroundView.swift */; };
 		2A2F9DAB3DA492157E9D55A0 /* ScaleLSDDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C542E6B7C70DFE18AFDDF9 /* ScaleLSDDemoApp.swift */; };
 		4D685E6B493C82025FCCE5CD /* DetectorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19B97B89D80C4D6B7DAD254A /* DetectorModel.swift */; };
 /* End PBXBuildFile section */
@@ -15,6 +16,7 @@
 /* Begin PBXFileReference section */
 		01E5AE221A86E6D87612E143 /* mlx-swift-ScaleLSD */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "mlx-swift-ScaleLSD"; path = ../..; sourceTree = SOURCE_ROOT; };
 		19B97B89D80C4D6B7DAD254A /* DetectorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectorModel.swift; sourceTree = "<group>"; };
+		A11934AF23A371219926A037 /* LookAroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LookAroundView.swift; sourceTree = "<group>"; };
 		A5173E87DB1B693E4D791C82 /* ScaleLSDDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScaleLSDDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B3C542E6B7C70DFE18AFDDF9 /* ScaleLSDDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScaleLSDDemoApp.swift; sourceTree = "<group>"; };
 		B55C02D85AB6C46D2BB9ACCC /* ScaleLSDDemo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ScaleLSDDemo.entitlements; sourceTree = "<group>"; };
@@ -53,6 +55,7 @@
 			isa = PBXGroup;
 			children = (
 				19B97B89D80C4D6B7DAD254A /* DetectorModel.swift */,
+				A11934AF23A371219926A037 /* LookAroundView.swift */,
 				B55C02D85AB6C46D2BB9ACCC /* ScaleLSDDemo.entitlements */,
 				B3C542E6B7C70DFE18AFDDF9 /* ScaleLSDDemoApp.swift */,
 			);
@@ -128,6 +131,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D685E6B493C82025FCCE5CD /* DetectorModel.swift in Sources */,
+				2A14D7D276C8F53407BBC1CC /* LookAroundView.swift in Sources */,
 				2A2F9DAB3DA492157E9D55A0 /* ScaleLSDDemoApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

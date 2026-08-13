@@ -58,9 +58,19 @@ struct ContentView: View {
     private var canvas: some View {
         ZStack {
             if let image = model.image {
-                WireframeView(
-                    image: image, segments: model.visibleSegments, junctions: model.junctions,
-                    groups: model.showVanishingPoints ? model.segmentGroups : [])
+                if model.isLookingAround, let pose = model.cameraPose {
+                    // Always grouped here: the whole reason the 3D view exists is that the
+                    // vanishing points resolved, so hiding the grouping would be perverse.
+                    LookAroundView(
+                        image: image, pose: pose, segments: model.visibleSegments,
+                        groups: model.segmentGroups)
+                } else {
+                    WireframeView(
+                        image: image, segments: model.visibleSegments,
+                        junctions: model.junctions,
+                        groups: model.showVanishingPoints ? model.segmentGroups : [],
+                        horizon: model.showHorizon ? model.cameraPose?.horizon : nil)
+                }
             } else {
                 EmptyStateView(model: model)
             }
@@ -127,6 +137,8 @@ struct WireframeView: View {
     let junctions: [Junction]
     /// Parallel to `segments`: which vanishing point each supports, or -1. Empty to disable.
     var groups: [Int] = []
+    /// Homogeneous line coefficients `(a, b, c)` with `ax + by + c = 0` in pixels, or nil.
+    var horizon: SIMD3<Float>?
 
     /// Matches WireframeRenderer.Style.vanishingPointColors, so the on-screen overlay and an
     /// exported PNG agree.
@@ -182,8 +194,64 @@ struct WireframeView: View {
                                 width: radius * 2, height: radius * 2)),
                         with: .color(.cyan))
                 }
+
+                if let horizon,
+                    let ends = Self.horizonEnds(
+                        horizon, width: CGFloat(image.width), height: CGFloat(image.height))
+                {
+                    var path = Path()
+                    path.addLines([
+                        CGPoint(
+                            x: origin.x + ends.0.x * scale, y: origin.y + ends.0.y * scale),
+                        CGPoint(
+                            x: origin.x + ends.1.x * scale, y: origin.y + ends.1.y * scale),
+                    ])
+                    context.stroke(
+                        path, with: .color(.white),
+                        style: .init(lineWidth: 1.4, dash: [7, 5]))
+                }
             }
         }
+    }
+
+    /// Where `ax + by + c = 0` crosses the image rectangle.
+    ///
+    /// Returns `nil` when the line misses the image — a common outcome for a steeply pitched
+    /// camera, where the horizon is genuinely out of frame.
+    private static func horizonEnds(
+        _ line: SIMD3<Float>, width: CGFloat, height: CGFloat
+    ) -> (CGPoint, CGPoint)? {
+        let a = CGFloat(line.x)
+        let b = CGFloat(line.y)
+        let c = CGFloat(line.z)
+        var hits: [CGPoint] = []
+        if abs(b) > 1e-9 {
+            for x in [0, width] {
+                let y = -(a * x + c) / b
+                if y >= 0, y <= height { hits.append(CGPoint(x: x, y: y)) }
+            }
+        }
+        if abs(a) > 1e-9 {
+            for y in [0, height] {
+                let x = -(b * y + c) / a
+                if x >= 0, x <= width { hits.append(CGPoint(x: x, y: y)) }
+            }
+        }
+        guard hits.count >= 2 else { return nil }
+        // A line through a corner is found by both loops, so pick the farthest-apart pair
+        // rather than the first two.
+        var best = (hits[0], hits[1])
+        var bestDistance: CGFloat = -1
+        for i in hits.indices {
+            for j in (i + 1) ..< hits.count {
+                let distance = hypot(hits[i].x - hits[j].x, hits[i].y - hits[j].y)
+                if distance > bestDistance {
+                    bestDistance = distance
+                    best = (hits[i], hits[j])
+                }
+            }
+        }
+        return bestDistance > 0 ? best : nil
     }
 }
 
@@ -312,6 +380,50 @@ struct InspectorView: View {
                     + "visible segments, so it follows the score threshold.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Camera") {
+                if let pose = model.cameraPose, let image = model.image {
+                    LabeledContent("Focal length") {
+                        Text(String(format: "%.1f px", pose.focalLength))
+                    }
+                    LabeledContent("Horizontal FOV") {
+                        Text(
+                            String(
+                                format: "%.1f°",
+                                pose.horizontalFieldOfView(width: Float(image.width))))
+                    }
+                    LabeledContent("Roll") { Text(String(format: "%.2f°", pose.roll)) }
+                    LabeledContent("Pitch") { Text(String(format: "%.2f°", pose.pitch)) }
+                    Toggle("Show horizon", isOn: $model.showHorizon)
+                }
+
+                Toggle(
+                    "Look around (3D)",
+                    isOn: Binding(
+                        get: { model.isLookingAround },
+                        set: { model.showLookAround = $0 })
+                )
+                .disabled(model.lookAroundUnavailableReason != nil)
+
+                Text(
+                    model.lookAroundUnavailableReason
+                        ?? "Rotates the recovered camera in place. A single image has no "
+                            + "parallax, so there is nothing to orbit — turning is the only "
+                            + "motion the data supports."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                if model.isLookingAround {
+                    Text("Gnomon: cyan and magenta are the two horizontal scene axes, white the "
+                        + "vertical one. Drawn as bars because the estimate fixes each axis "
+                        + "only up to sign.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Section("Status") {

@@ -40,3 +40,20 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGNING_REQUIRED: YES
         CODE_SIGNING_ALLOWED: YES
+
+# Declared explicitly so `xcodegen generate` is idempotent. Without this it *deletes* the
+# shared scheme and does not recreate one, which silently breaks `-scheme ScaleLSDDemo`
+# for anyone who regenerates the project.
+schemes:
+  ScaleLSDDemo:
+    build:
+      targets:
+        ScaleLSDDemo: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

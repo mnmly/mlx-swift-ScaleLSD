@@ -43,15 +43,20 @@ final class DetectorModel {
         didSet { scheduleRedecode() }
     }
     var showJunctions = true
-    /// Group segments by the vanishing point they converge on.
-    var showVanishingPoints = false {
-        didSet { recomputeVanishingPoints() }
-    }
+    /// Colour segments by the vanishing point they converge on.
+    var showVanishingPoints = false
+    /// Draw the recovered horizon over the 2D canvas.
+    var showHorizon = false
+    /// Swap the canvas for the 3D look-around view. Only meaningful with a ``cameraPose``.
+    var showLookAround = false
 
     private(set) var visibleSegments: [LineSegment] = []
     private(set) var vanishingPoints: [VanishingPoint] = []
     /// Parallel to ``visibleSegments``: index into ``vanishingPoints``, or -1 for unassigned.
     private(set) var segmentGroups: [Int] = []
+    /// Focal length and orientation implied by the vanishing points, when an orthogonal pair
+    /// exists. `nil` is a normal outcome, not an error — see ``lookAroundUnavailableReason``.
+    private(set) var cameraPose: CameraPose?
 
     private var session: ScaleLSDSession?
     private var field: FieldHandle?
@@ -59,6 +64,23 @@ final class DetectorModel {
     private var redecode: Task<Void, Never>?
 
     var junctions: [Junction] { showJunctions ? (result?.junctions ?? []) : [] }
+
+    /// Whether the canvas is actually showing the 3D view.
+    ///
+    /// Separate from ``showLookAround`` so that losing the pose — raising the score threshold
+    /// until too few segments survive, say — drops back to 2D and reads as off, yet restores the
+    /// user's choice once the pose comes back.
+    var isLookingAround: Bool { showLookAround && cameraPose != nil }
+
+    /// Why the 3D view cannot be offered, or `nil` when it can.
+    var lookAroundUnavailableReason: String? {
+        guard image != nil else { return "Open an image first." }
+        guard cameraPose == nil else { return nil }
+        return vanishingPoints.count < 2
+            ? "Needs at least two vanishing points; this image has "
+                + "\(vanishingPoints.count)."
+            : "No orthogonal pair of vanishing points, so focal length is undetermined."
+    }
 
     var statusText: String {
         switch phase {
@@ -169,6 +191,9 @@ final class DetectorModel {
         field = nil
         result = nil
         visibleSegments = []
+        vanishingPoints = []
+        segmentGroups = []
+        cameraPose = nil
         detect()
     }
 
@@ -216,10 +241,15 @@ final class DetectorModel {
     /// Vanishing points are derived from the *visible* segments, so they follow the score
     /// threshold. Estimation is milliseconds on a few hundred segments — cheap enough to redo
     /// on a slider drag, and far cheaper than the decode, let alone the network.
+    ///
+    /// Runs unconditionally rather than behind ``showVanishingPoints``: the pose readout and the
+    /// availability of the 3D view both depend on the result, so gating it would mean the user
+    /// had to enable a display toggle to find out whether another control is even offered.
     private func recomputeVanishingPoints() {
-        guard showVanishingPoints, !visibleSegments.isEmpty else {
+        guard !visibleSegments.isEmpty else {
             vanishingPoints = []
             segmentGroups = []
+            cameraPose = nil
             return
         }
         vanishingPoints = VanishingPointEstimator.estimate(segments: visibleSegments)
@@ -231,6 +261,12 @@ final class DetectorModel {
             }
         }
         segmentGroups = groups
+
+        cameraPose = image.flatMap { image in
+            CameraPoseEstimator.estimate(
+                vanishingPoints: vanishingPoints,
+                imageSize: (width: image.width, height: image.height))
+        }
     }
 
     /// Cheaper than inference: re-runs the decoder against the retained field.

@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "2700"
+   LastUpgradeVersion = "1430"
    version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES"
-      buildArchitectures = "Automatic">
+      runPostActionsOnFailure = "NO">
       <BuildActionEntries>
          <BuildActionEntry
             buildForTesting = "YES"
@@ -17,6 +17,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "C6E86CE4923644A4869EE0EA"
                BuildableName = "ScaleLSDDemo.app"
+               BlueprintName = "ScaleLSDDemo"
                ReferencedContainer = "container:ScaleLSDDemo.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -27,10 +28,21 @@
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
-      shouldAutocreateTestPlan = "YES">
+      onlyGenerateCoverageForSpecifiedTargets = "NO">
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "C6E86CE4923644A4869EE0EA"
+            BuildableName = "ScaleLSDDemo.app"
+            BlueprintName = "ScaleLSDDemo"
+            ReferencedContainer = "container:ScaleLSDDemo.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
+      <Testables>
+      </Testables>
    </TestAction>
    <LaunchAction
-      buildConfiguration = "Release"
+      buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       launchStyle = "0"
@@ -38,21 +50,19 @@
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
-      enableGPUValidationMode = "1"
-      allowLocationSimulation = "YES"
-      queueDebuggingEnabled = "No">
+      allowLocationSimulation = "YES">
       <BuildableProductRunnable
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "C6E86CE4923644A4869EE0EA"
             BuildableName = "ScaleLSDDemo.app"
+            BlueprintName = "ScaleLSDDemo"
             ReferencedContainer = "container:ScaleLSDDemo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <MetalAPIValidationSettings
-         isEnabled = "No">
-      </MetalAPIValidationSettings>
+      <CommandLineArguments>
+      </CommandLineArguments>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -66,9 +76,12 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "C6E86CE4923644A4869EE0EA"
             BuildableName = "ScaleLSDDemo.app"
+            BlueprintName = "ScaleLSDDemo"
             ReferencedContainer = "container:ScaleLSDDemo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <CommandLineArguments>
+      </CommandLineArguments>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">

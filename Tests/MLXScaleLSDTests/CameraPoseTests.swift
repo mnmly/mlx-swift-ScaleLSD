@@ -25,10 +25,13 @@ struct CameraPoseTests {
         return VanishingPoint(x: x, y: y, w: 1, supportingSegments: [], support: support)
     }
 
-    /// Rotation about X then Y then Z, in degrees.
+    /// Rotation about X then Y then Z, in degrees, with `pitch` positive looking *up*.
+    ///
+    /// Camera coordinates here are y-down (the projection below adds `f·y/z` to the centre), so
+    /// a positive rotation about +x tips the view downward — hence the negation.
     private func rotation(pitch: Float, yaw: Float, roll: Float) -> simd_float3x3 {
         func radians(_ d: Float) -> Float { d * .pi / 180 }
-        let x = simd_float3x3(simd_quatf(angle: radians(pitch), axis: SIMD3(1, 0, 0)))
+        let x = simd_float3x3(simd_quatf(angle: radians(-pitch), axis: SIMD3(1, 0, 0)))
         let y = simd_float3x3(simd_quatf(angle: radians(yaw), axis: SIMD3(0, 1, 0)))
         let z = simd_float3x3(simd_quatf(angle: radians(roll), axis: SIMD3(0, 0, 1)))
         return z * x * y
@@ -144,5 +147,39 @@ struct CameraPoseTests {
         #expect(
             CameraPoseEstimator.estimate(
                 vanishingPoints: [finite, atInfinity], imageSize: size) == nil)
+    }
+}
+
+extension CameraPoseTests {
+
+    /// Pitch sign. The convention is "positive looking up", and the unambiguous image-space
+    /// statement of that is: looking *down* puts the horizon *above* the principal point
+    /// (smaller y, since image y grows downward).
+    @Test("Pitch is signed with positive looking up")
+    func pitchSign() {
+        let focal: Float = 600
+        for truth in [Float(-12), -6, 0, 6, 12] {
+            let r = rotation(pitch: truth, yaw: 35, roll: 0)
+            let points = [
+                vanishingPoint(direction: SIMD3(1, 0, 0), rotation: r, focal: focal),
+                vanishingPoint(direction: SIMD3(0, 0, 1), rotation: r, focal: focal),
+            ].compactMap { $0 }
+
+            let pose = try! #require(
+                CameraPoseEstimator.estimate(vanishingPoints: points, imageSize: size))
+            #expect(
+                abs(pose.pitch - truth) < 1.0,
+                "pitch \(truth) recovered as \(pose.pitch)")
+
+            // Cross-check against the horizon's position, independent of the pitch formula.
+            // Horizon y where it crosses the image centre column: a·x + b·y + c = 0.
+            if abs(pose.horizon.y) > 1e-6 {
+                let horizonY =
+                    -(pose.horizon.x * pose.principalPoint.x + pose.horizon.z) / pose.horizon.y
+                let above = horizonY < pose.principalPoint.y
+                if truth < -0.5 { #expect(above, "looking down should put the horizon above centre") }
+                if truth > 0.5 { #expect(!above, "looking up should put the horizon below centre") }
+            }
+        }
     }
 }

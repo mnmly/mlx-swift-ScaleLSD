@@ -78,13 +78,19 @@ public struct CameraPose: Sendable, Equatable {
 
     /// Camera pitch in degrees — positive looking up, negative looking down.
     ///
-    /// Derived from where the horizon sits relative to the principal point.
+    /// Equivalently: looking down puts the horizon *above* the principal point, because image
+    /// y grows downward.
+    ///
+    /// Taken from the elevation of the optical axis relative to the scene's horizontal plane,
+    /// i.e. the z component of the (upward) vertical axis. Deriving it from the horizon's
+    /// distance to the principal point instead is sign-ambiguous: negating `(a, b, c)` names
+    /// the same line, so the sign has to come from the oriented vertical axis.
     public var pitch: Float {
-        let distance =
-            (horizon.x * principalPoint.x + horizon.y * principalPoint.y + horizon.z)
-            / (horizon.x * horizon.x + horizon.y * horizon.y).squareRoot()
-        return atan(distance / focalLength) * 180 / .pi
+        asin(max(-1, min(1, verticalDirection.z))) * 180 / .pi
     }
+
+    /// The scene's vertical axis in camera coordinates, oriented so it points *up* the image.
+    public var verticalDirection: SIMD3<Float> { rotation.columns.1 }
 
     /// The homography that re-renders the image as though the camera had rotated by `delta`.
     ///
@@ -172,8 +178,10 @@ public enum CameraPoseEstimator {
         var axes = [d0, d1, d2]
         let vertical = axes.indices.max { abs(axes[$0].y) < abs(axes[$1].y) } ?? 2
 
-        // Canonicalise signs so "up" points up the image and the frame stays right-handed.
-        if axes[vertical].y < 0 { axes[vertical] = -axes[vertical] }
+        // Canonicalise so the vertical axis genuinely points *up*, which means **negative** y:
+        // image y grows downward. Getting this backwards silently inverts `pitch`, since the
+        // horizon alone cannot disambiguate up from down.
+        if axes[vertical].y > 0 { axes[vertical] = -axes[vertical] }
         let horizontals = axes.indices.filter { $0 != vertical }
         d0 = axes[horizontals[0]]
         d1 = axes[horizontals[1]]
